@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mclara9593/caronas/internal/graph"
+	"github.com/mclara9593/caronasDistribuidas/internal/graph"
 )
 
 // PeersRegistry mantém o mapeamento entre o id de cada servidor do

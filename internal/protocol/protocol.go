@@ -58,7 +58,7 @@ type LoginResult struct {
 type PushRide struct {
 	Route         []string  `json:"route"`
 	DepartureTime string    `json:"departure_time"`
-	Capacity      int       `json:"available_seats"`
+	Assentos      []int     `json:"assentos"`     // assentos por trecho: Assentos[i] é a quantidade de assentos de Route[i] -> Route[i+1]
 	Precos        []float64 `json:"precos"`       // um preço por trecho: Precos[i] é o preço de Route[i] -> Route[i+1]
 	DriverEmail   string    `json:"driver_email"` // email do motorista logado que está publicando
 }
@@ -76,6 +76,7 @@ type SectionInfo struct {
 	Destino   string  `json:"destino"`
 	Assentos  int     `json:"assentos"`
 	Preco     float64 `json:"preco"`
+	Empresa   string  `json:"empresa"`
 }
 
 type RideInfo struct {
@@ -88,12 +89,6 @@ type RideInfo struct {
 // PublishRideResult é devolvido ao motorista assim que a carona é cadastrada no Grafo,
 // para que ele saiba qual ID usar depois pra cancelar ou consultar essa carona.
 type PublishRideResult struct {
-	RideID string `json:"ride_id"`
-}
-
-// BookRideResult é devolvido ao passageiro assim que a reserva é confirmada,
-// para que ele saiba qual ID usar depois pra cancelar essa reserva.
-type BookRideResult struct {
 	RideID string `json:"ride_id"`
 }
 
@@ -146,4 +141,37 @@ type GiveRoute struct {
 	Destination string   `json:"destination"`
 	Source      string   `json:"source"`
 	Route       []string `json:"route_by_sender"`
+}
+
+type BookRideRequest struct {
+	RideID         string `json:"ride_id"` // ID do itinerário exibido na busca
+	PassengerEmail string `json:"passenger_email"`
+}
+
+type BookRideResult struct {
+	ReservationID string `json:"reservation_id"`
+}
+
+type CancelBookingRequest struct {
+	ReservationID  string `json:"reservation_id"`
+	PassengerEmail string `json:"passenger_email"`
+}
+
+type TransactionSection struct {
+	SectionID string `json:"section_id"` // formato idTrecho@idServidor
+	Seats     int    `json:"seats"`
+}
+
+type TransactionRequest struct {
+	TransactionID    string               `json:"transaction_id"`
+	PassengerEmail   string               `json:"passenger_email"`
+	OriginServer     string               `json:"origin_server"`
+	LamportTimestamp uint64               `json:"lamport_timestamp"`
+	Sections         []TransactionSection `json:"sections"`
+}
+
+type TransactionResponse struct {
+	TransactionID string `json:"transaction_id"`
+	Accepted      bool   `json:"accepted"`
+	Reason        string `json:"reason,omitempty"`
 }

@@ -1,0 +1,71 @@
+{
+  "nodes": {
+    "fsa": [
+      {
+        "id": "ride-req-1793734055059772242-sec-fsa-ssa",
+        "origem": "fsa",
+        "destino": "ssa",
+        "assentos": 6,
+        "preco": 5
+      },
+      {
+        "id": "ride-req-1793744362623352193-sec-fsa-ssa",
+        "origem": "fsa",
+        "destino": "ssa",
+        "assentos": 4,
+        "preco": 4
+      }
+    ],
+    "ssa": [
+      {
+        "id": "ride-req-1793744362623352193-sec-ssa-al",
+        "origem": "ssa",
+        "destino": "al",
+        "assentos": 5,
+        "preco": 5
+      }
+    ]
+  },
+  "rides": {
+    "ride-req-1793734055059772242": {
+      "id": "ride-req-1793734055059772242",
+      "Sections": [
+        {
+          "id": "ride-req-1793734055059772242-sec-fsa-ssa",
+          "origem": "fsa",
+          "destino": "ssa",
+          "assentos": 6,
+          "preco": 5
+        }
+      ],
+      "id_driver": "clara",
+      "total_price": 5
+    },
+    "ride-req-1793744362623352193": {
+      "id": "ride-req-1793744362623352193",
+      "Sections": [
+        {
+          "id": "ride-req-1793744362623352193-sec-fsa-ssa",
+          "origem": "fsa",
+          "destino": "ssa",
+          "assentos": 4,
+          "preco": 4
+        },
+        {
+          "id": "ride-req-1793744362623352193-sec-ssa-al",
+          "origem": "ssa",
+          "destino": "al",
+          "assentos": 5,
+          "preco": 5
+        }
+      ],
+      "id_driver": "l",
+      "total_price": 9
+    }
+  },
+  "itineraries": {},
+  "itin_seq": 0,
+  "pendentes": {},
+  "reservas": {},
+  "cancelamentos_pendentes": {}
+}

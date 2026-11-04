@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	protocol "github.com/mclara9593/caronas/internal/protocol"
+	protocol "github.com/mclara9593/caronasDistribuidas/internal/protocol"
 )
 
 // ServidoresConsorcio mapeia o identificador de cada empresa do

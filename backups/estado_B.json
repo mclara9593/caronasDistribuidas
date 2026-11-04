@@ -1,0 +1,50 @@
+{
+  "nodes": {
+    "fsa": [
+      {
+        "id": "ride-req-1793746980952564538-sec-fsa-ca",
+        "origem": "fsa",
+        "destino": "ca",
+        "assentos": 8,
+        "preco": 8
+      }
+    ],
+    "ssa": [
+      {
+        "id": "ride-req-1793746980952564538-sec-ssa-fsa",
+        "origem": "ssa",
+        "destino": "fsa",
+        "assentos": 7,
+        "preco": 7
+      }
+    ]
+  },
+  "rides": {
+    "ride-req-1793746980952564538": {
+      "id": "ride-req-1793746980952564538",
+      "Sections": [
+        {
+          "id": "ride-req-1793746980952564538-sec-ssa-fsa",
+          "origem": "ssa",
+          "destino": "fsa",
+          "assentos": 7,
+          "preco": 7
+        },
+        {
+          "id": "ride-req-1793746980952564538-sec-fsa-ca",
+          "origem": "fsa",
+          "destino": "ca",
+          "assentos": 8,
+          "preco": 8
+        }
+      ],
+      "id_driver": "l",
+      "total_price": 15
+    }
+  },
+  "itineraries": {},
+  "itin_seq": 0,
+  "pendentes": {},
+  "reservas": {},
+  "cancelamentos_pendentes": {}
+}
