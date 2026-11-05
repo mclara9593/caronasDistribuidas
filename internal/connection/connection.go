@@ -23,25 +23,30 @@ var ServidoresConsorcio = map[string]string{
 }
 
 // EscolherServidor pergunta ao usuário a qual empresa do consórcio ele
-// deseja se conectar. A escolha acontece de forma síncrona, dentro da
-// mesma goroutine que já está executando o cliente (a goroutine main):
-// não é disparada nenhuma goroutine adicional para resolver a escolha
-// nem para tentar conectar a mais de um servidor ao mesmo tempo.
+// deseja se conectar e opcionalmente permite informar um endereço customizado.
 func EscolherServidor(reader *bufio.Reader) (idEmpresa string, endereco string, err error) {
 	fmt.Println("\nA qual empresa do consórcio você deseja se conectar?")
 	for id, end := range ServidoresConsorcio {
-		fmt.Printf("  %s -> %s\n", id, end)
+		fmt.Printf("  %s -> padrão: %s\n", id, end)
 	}
 	fmt.Print("Digite a letra da empresa (A, B ou C): ")
 
 	escolha, _ := reader.ReadString('\n')
 	escolha = strings.ToUpper(strings.TrimSpace(escolha))
 
-	end, existe := ServidoresConsorcio[escolha]
+	endPadrao, existe := ServidoresConsorcio[escolha]
 	if !existe {
 		return "", "", fmt.Errorf("empresa %q não reconhecida", escolha)
 	}
-	return escolha, end, nil
+
+	fmt.Printf("Endereço do servidor da empresa %s (pressione Enter para usar padrão %s): ", escolha, endPadrao)
+	customEnd, _ := reader.ReadString('\n')
+	customEnd = strings.TrimSpace(customEnd)
+	if customEnd != "" {
+		return escolha, customEnd, nil
+	}
+
+	return escolha, endPadrao, nil
 }
 
 // função para conectar ao servidor com tentativas limitadas

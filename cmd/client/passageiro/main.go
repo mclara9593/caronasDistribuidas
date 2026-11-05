@@ -156,6 +156,7 @@ func consultarReservas(cliente *connection.Cliente) {
 
 func main() {
 	empresaFlag := flag.String("empresa", "", "Identificador da empresa do consórcio a quem conectar (A, B ou C). Se omitido, a escolha é feita de forma interativa.")
+	addrFlag := flag.String("addr", "", "Endereço TCP do servidor (ex: 192.168.1.50:9593). Se omitido, usa o endereço padrão da empresa.")
 	flag.Parse()
 
 	reader := bufio.NewReader(os.Stdin)
@@ -165,12 +166,25 @@ func main() {
 
 	if *empresaFlag != "" {
 		idEmpresa = strings.ToUpper(*empresaFlag)
-		existe := false
-		endereco, existe = connection.ServidoresConsorcio[idEmpresa]
-		if !existe {
+		endPadrao, existe := connection.ServidoresConsorcio[idEmpresa]
+		if !existe && *addrFlag == "" {
 			fmt.Printf("Empresa %q não reconhecida.\n", idEmpresa)
 			os.Exit(1)
 		}
+		if *addrFlag != "" {
+			endereco = *addrFlag
+		} else {
+			endereco = endPadrao
+		}
+	} else if *addrFlag != "" {
+		// Endereço passado mas sem flag -empresa: pergunta a empresa correspondente
+		fmt.Print("Digite a letra da empresa deste servidor (A, B ou C): ")
+		escolha, _ := reader.ReadString('\n')
+		idEmpresa = strings.ToUpper(strings.TrimSpace(escolha))
+		if idEmpresa == "" {
+			idEmpresa = "A"
+		}
+		endereco = *addrFlag
 	} else {
 		idEmpresa, endereco, err = connection.EscolherServidor(reader)
 		if err != nil {

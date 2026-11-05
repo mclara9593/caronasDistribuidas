@@ -19,11 +19,18 @@ A 	192.168.1.21 	9592 	8081
 B 	192.168.1.22 	9594 	8081
 C 	192.168.1.23 	9596 	8081
 
+# Máquina A (substitua IPB e IPC pelos IPs reais das máquinas B e C)
+go run ./cmd/server -id A -tcp :9592 -http :8081 \
+  -peers "B=http://IPB:8081,C=http://IPC:8081"
 
-go run ./cmd/server -id A -tcp :9593 -http :8081 -peers "B=http://localhost:8082,C=http://localhost:8083"
- go run ./cmd/server -id B -tcp :9594 -http :8082 -peers "A=http://localhost:8081,C=http://localhost:8083"
-go run ./cmd/server -id C -tcp :9595 -http :8083 -peers "A=http://localhost:8081,B=http://localhost:8082"
+# Máquina B (substitua IPA e IPC pelos IPs reais das máquinas A e C)
+go run ./cmd/server -id B -tcp :9594 -http :8081 \
+  -peers "A=http://IPA:8081,C=http://IPC:8081"
 
-go run ./cmd/client/motorista
+# Máquina C (substitua IPA e IPB pelos IPs reais das máquinas A e B)
+go run ./cmd/server -id C -tcp :9596 -http :8081 \
+  -peers "A=http://IPA:8081,B=http://IPB:8081"
 
-go run ./cmd/client/passageiro -empresa 
+# Conectar clientes remotamente (passando a empresa e o IP:porta da máquina desejada):
+go run ./cmd/client/motorista -empresa A -addr 192.168.1.21:9592
+go run ./cmd/client/passageiro -empresa B -addr 192.168.1.22:9594 
