@@ -245,8 +245,9 @@ func (g *Grafo) RidesByDriver(idDriver string) []Ride {
 	return resultado
 }
 
-// RemoveRide mantém a assinatura usada pelo servidor e recusa a remoção
-// quando existem reservas confirmadas ou transações pendentes nos trechos.
+// RemoveRide mantém a assinatura usada pelo servidor.
+// A remoção direta continua recusando caronas com reservas; use o fluxo
+// coordenado do servidor para cancelar reservas distribuídas primeiro.
 func (g *Grafo) RemoveRide(idRide string) error {
 	return g.RemoveRideIfUnreserved(idRide)
 }
@@ -285,6 +286,43 @@ func (g *Grafo) RemoveRideIfUnreserved(idRide string) error {
 	return nil
 }
 
+// ReservationsForRide retorna cópias das reservas locais que usam pelo
+// menos um trecho da carona. Cada resultado contém todos os trechos locais
+// daquela reserva; a coordenação reunirá os trechos guardados nos peers.
+func (g *Grafo) ReservationsForRide(rideID string) ([]Reservation, error) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	ride, existe := g.Rides[rideID]
+	if !existe {
+		return nil, fmt.Errorf("carona %q não encontrada", rideID)
+	}
+
+	sectionIDs := make(map[string]bool, len(ride.Sections))
+	for _, section := range ride.Sections {
+		sectionIDs[section.IdSection] = true
+	}
+
+	var resultado []Reservation
+	for _, reservation := range g.Reservas {
+		usaCarona := false
+		for _, id := range reservation.SectionIDs {
+			if sectionIDs[id] {
+				usaCarona = true
+				break
+			}
+		}
+		if !usaCarona {
+			continue
+		}
+
+		reservation.SectionIDs = append([]string(nil), reservation.SectionIDs...)
+		resultado = append(resultado, reservation)
+	}
+
+	return resultado, nil
+}
+
 // AdjustSeats preserva a API anterior para outros pontos do projeto.
 // Reservas distribuídas devem usar PrepareReservation/CommitReservation.
 func (g *Grafo) AdjustSeats(sectionIDs []string, delta int) bool {
@@ -312,6 +350,18 @@ func (g *Grafo) AdjustSeats(sectionIDs []string, delta int) bool {
 		g.ajustarAssentosSemLock(id, delta)
 	}
 	return true
+}
+
+func (g *Grafo) RideByID(rideID string) (Ride, bool) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	ride, existe := g.Rides[rideID]
+	if !existe {
+		return Ride{}, false
+	}
+	ride.Sections = append([]Section(nil), ride.Sections...)
+	return ride, true
 }
 
 // PrepareReservation registra uma reserva pendente sem descontar imediatamente
@@ -712,4 +762,52 @@ func mesmosIDs(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+func (g *Grafo) ReservationsByPassenger(passengerEmail string) []Reservation {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	var resultado []Reservation
+	for _, reservation := range g.Reservas {
+		if reservation.PassengerEmail != passengerEmail {
+			continue
+		}
+
+		reservation.SectionIDs = append([]string(nil), reservation.SectionIDs...)
+		resultado = append(resultado, reservation)
+	}
+	return resultado
+}
+
+// ReservationsUsingSections retorna reservas locais que usam pelo menos
+// um dos trechos informados. As listas retornadas são cópias.
+func (g *Grafo) ReservationsUsingSections(sectionIDs []string) []Reservation {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	alvo := make(map[string]bool, len(sectionIDs))
+	for _, id := range sectionIDs {
+		if id != "" {
+			alvo[id] = true
+		}
+	}
+
+	var resultado []Reservation
+	for _, reservation := range g.Reservas {
+		usaTrecho := false
+		for _, id := range reservation.SectionIDs {
+			if alvo[id] {
+				usaTrecho = true
+				break
+			}
+		}
+		if !usaTrecho {
+			continue
+		}
+
+		reservation.SectionIDs = append([]string(nil), reservation.SectionIDs...)
+		resultado = append(resultado, reservation)
+	}
+	return resultado
 }

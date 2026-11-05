@@ -161,7 +161,19 @@ func cancelarCarona(cliente *connection.Cliente, reader *bufio.Reader) {
 	idCarona, _ := reader.ReadString('\n')
 	idCarona = strings.TrimSpace(idCarona)
 
-	resp, err := cliente.EnviarRequisicao("cancel_ride", protocol.GetID{RideID: idCarona})
+	fmt.Printf("Tem certeza que deseja cancelar a carona %s? (s/n): ", idCarona)
+	confirmacao, _ := reader.ReadString('\n')
+	confirmacao = strings.ToLower(strings.TrimSpace(confirmacao))
+
+	if confirmacao != "s" && confirmacao != "sim" {
+		fmt.Println("Cancelamento não realizado.")
+		return
+	}
+
+	resp, err := cliente.EnviarRequisicao(
+		"cancel_ride",
+		protocol.GetID{RideID: idCarona},
+	)
 	if err != nil {
 		fmt.Printf("Erro ao cancelar carona: %v\n", err)
 		return

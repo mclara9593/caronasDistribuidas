@@ -7,6 +7,41 @@
         "destino": "ca",
         "assentos": 8,
         "preco": 8
+      },
+      {
+        "id": "ride-req-1793822297112296360-sec-fsa-ssa",
+        "origem": "fsa",
+        "destino": "ssa",
+        "assentos": 6,
+        "preco": 6
+      },
+      {
+        "id": "ride-req-1793835728180703881-sec-fsa-ssa",
+        "origem": "fsa",
+        "destino": "ssa",
+        "assentos": 5,
+        "preco": 4
+      },
+      {
+        "id": "ride-req-1793842130155958260-sec-fsa-ssa",
+        "origem": "fsa",
+        "destino": "ssa",
+        "assentos": 6,
+        "preco": 5
+      },
+      {
+        "id": "ride-req-1793844368800574655-sec-fsa-ssa",
+        "origem": "fsa",
+        "destino": "ssa",
+        "assentos": 4,
+        "preco": 4
+      },
+      {
+        "id": "ride-req-1793846445366616243-sec-fsa-ssa",
+        "origem": "fsa",
+        "destino": "ssa",
+        "assentos": 5,
+        "preco": 5
       }
     ],
     "ssa": [
@@ -16,6 +51,13 @@
         "destino": "fsa",
         "assentos": 7,
         "preco": 7
+      },
+      {
+        "id": "ride-req-1793823653598548147-sec-ssa-fsa",
+        "origem": "ssa",
+        "destino": "fsa",
+        "assentos": 6,
+        "preco": 5
       }
     ]
   },
@@ -40,11 +82,205 @@
       ],
       "id_driver": "l",
       "total_price": 15
+    },
+    "ride-req-1793822297112296360": {
+      "id": "ride-req-1793822297112296360",
+      "Sections": [
+        {
+          "id": "ride-req-1793822297112296360-sec-fsa-ssa",
+          "origem": "fsa",
+          "destino": "ssa",
+          "assentos": 6,
+          "preco": 6
+        }
+      ],
+      "id_driver": "m",
+      "total_price": 6
+    },
+    "ride-req-1793823653598548147": {
+      "id": "ride-req-1793823653598548147",
+      "Sections": [
+        {
+          "id": "ride-req-1793823653598548147-sec-ssa-fsa",
+          "origem": "ssa",
+          "destino": "fsa",
+          "assentos": 6,
+          "preco": 5
+        }
+      ],
+      "id_driver": "m",
+      "total_price": 5
+    },
+    "ride-req-1793835728180703881": {
+      "id": "ride-req-1793835728180703881",
+      "Sections": [
+        {
+          "id": "ride-req-1793835728180703881-sec-fsa-ssa",
+          "origem": "fsa",
+          "destino": "ssa",
+          "assentos": 5,
+          "preco": 4
+        }
+      ],
+      "id_driver": "b",
+      "total_price": 4
+    },
+    "ride-req-1793842130155958260": {
+      "id": "ride-req-1793842130155958260",
+      "Sections": [
+        {
+          "id": "ride-req-1793842130155958260-sec-fsa-ssa",
+          "origem": "fsa",
+          "destino": "ssa",
+          "assentos": 6,
+          "preco": 5
+        }
+      ],
+      "id_driver": "p",
+      "total_price": 5
+    },
+    "ride-req-1793844368800574655": {
+      "id": "ride-req-1793844368800574655",
+      "Sections": [
+        {
+          "id": "ride-req-1793844368800574655-sec-fsa-ssa",
+          "origem": "fsa",
+          "destino": "ssa",
+          "assentos": 4,
+          "preco": 4
+        }
+      ],
+      "id_driver": "r",
+      "total_price": 4
+    },
+    "ride-req-1793846445366616243": {
+      "id": "ride-req-1793846445366616243",
+      "Sections": [
+        {
+          "id": "ride-req-1793846445366616243-sec-fsa-ssa",
+          "origem": "fsa",
+          "destino": "ssa",
+          "assentos": 5,
+          "preco": 5
+        }
+      ],
+      "id_driver": "g",
+      "total_price": 5
     }
   },
-  "itineraries": {},
-  "itin_seq": 0,
+  "itineraries": {
+    "rota-1": [
+      "ride-req-1793822297112296360-sec-fsa-ssa"
+    ],
+    "rota-10": [
+      "ride-req-1793842130155958260-sec-fsa-ssa"
+    ],
+    "rota-11": [
+      "ride-req-1793822297112296360-sec-fsa-ssa"
+    ],
+    "rota-12": [
+      "ride-req-1793835728180703881-sec-fsa-ssa"
+    ],
+    "rota-13": [
+      "ride-req-1793842130155958260-sec-fsa-ssa"
+    ],
+    "rota-14": [
+      "ride-req-1793844368800574655-sec-fsa-ssa"
+    ],
+    "rota-15": [
+      "ride-req-1793822297112296360-sec-fsa-ssa"
+    ],
+    "rota-16": [
+      "ride-req-1793835728180703881-sec-fsa-ssa"
+    ],
+    "rota-17": [
+      "ride-req-1793842130155958260-sec-fsa-ssa"
+    ],
+    "rota-18": [
+      "ride-req-1793844368800574655-sec-fsa-ssa"
+    ],
+    "rota-19": [
+      "ride-req-1793846445366616243-sec-fsa-ssa"
+    ],
+    "rota-2": [
+      "ride-req-1793822297112296360-sec-fsa-ssa"
+    ],
+    "rota-20": [
+      "ride-req-1793822297112296360-sec-fsa-ssa"
+    ],
+    "rota-21": [
+      "ride-req-1793835728180703881-sec-fsa-ssa"
+    ],
+    "rota-22": [
+      "ride-req-1793842130155958260-sec-fsa-ssa"
+    ],
+    "rota-23": [
+      "ride-req-1793844368800574655-sec-fsa-ssa"
+    ],
+    "rota-24": [
+      "ride-req-1793846445366616243-sec-fsa-ssa"
+    ],
+    "rota-25": [
+      "ride-req-1793848950884059989-sec-fsa-ssa"
+    ],
+    "rota-3": [
+      "ride-req-1793835728180703881-sec-fsa-ssa"
+    ],
+    "rota-4": null,
+    "rota-5": [
+      "ride-req-1793822297112296360-sec-fsa-ssa"
+    ],
+    "rota-6": [
+      "ride-req-1793835728180703881-sec-fsa-ssa"
+    ],
+    "rota-7": [
+      "ride-req-1793842130155958260-sec-fsa-ssa"
+    ],
+    "rota-8": [
+      "ride-req-1793822297112296360-sec-fsa-ssa"
+    ],
+    "rota-9": [
+      "ride-req-1793835728180703881-sec-fsa-ssa"
+    ]
+  },
+  "itin_seq": 25,
   "pendentes": {},
-  "reservas": {},
+  "reservas": {
+    "res-B-1793822351118311077": {
+      "reservation_id": "res-B-1793822351118311077",
+      "passenger_email": "p",
+      "section_ids": [
+        "ride-req-1793822297112296360-sec-fsa-ssa"
+      ]
+    },
+    "res-B-1793836590899484216": {
+      "reservation_id": "res-B-1793836590899484216",
+      "passenger_email": "p",
+      "section_ids": [
+        "ride-req-1793835728180703881-sec-fsa-ssa"
+      ]
+    },
+    "res-B-1793842852122450887": {
+      "reservation_id": "res-B-1793842852122450887",
+      "passenger_email": "m",
+      "section_ids": [
+        "ride-req-1793842130155958260-sec-fsa-ssa"
+      ]
+    },
+    "res-B-1793844564836705350": {
+      "reservation_id": "res-B-1793844564836705350",
+      "passenger_email": "j",
+      "section_ids": [
+        "ride-req-1793844368800574655-sec-fsa-ssa"
+      ]
+    },
+    "res-B-1793846788655627863": {
+      "reservation_id": "res-B-1793846788655627863",
+      "passenger_email": "p",
+      "section_ids": [
+        "ride-req-1793846445366616243-sec-fsa-ssa"
+      ]
+    }
+  },
   "cancelamentos_pendentes": {}
 }

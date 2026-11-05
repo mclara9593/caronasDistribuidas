@@ -116,13 +116,42 @@ func buscarItinerarios(cliente *connection.Cliente, reader *bufio.Reader) {
 }
 
 func consultarReservas(cliente *connection.Cliente) {
-	resp, err := cliente.EnviarRequisicao("get_bookings", protocol.GetID{})
+	resp, err := cliente.EnviarRequisicao("get_bookings", protocol.GetBookingsRequest{
+		PassengerEmail: cliente.UsuarioLogado,
+	})
 	if err != nil {
-		fmt.Printf("❌ Erro de comunicação: %v\n", err)
+		fmt.Printf("Erro de comunicação: %v\n", err)
 		return
 	}
 
-	fmt.Printf("📩 Resposta do Servidor: [%s] %s\n", resp.Status, resp.Message)
+	fmt.Printf("Resposta do servidor: [%s] %s\n", resp.Status, resp.Message)
+
+	if resp.Status != "SUCCESS" {
+		return
+	}
+
+	var reservas []protocol.BookingInfo
+	if len(resp.Payload) == 0 || string(resp.Payload) == "null" {
+		fmt.Println("Você ainda não possui reservas,ou o motorista cancelou a viagem")
+		return
+	}
+
+	if err := json.Unmarshal(resp.Payload, &reservas); err != nil {
+		fmt.Printf("Erro ao interpretar as reservas: %v\n", err)
+		return
+	}
+
+	if len(reservas) == 0 {
+		fmt.Println("Você ainda não possui reservas,ou o motorista cancelou a viagem")
+		return
+	}
+
+	for _, reserva := range reservas {
+		fmt.Printf("\nReserva: %s\n", reserva.ReservationID)
+		for _, trechoID := range reserva.SectionIDs {
+			fmt.Printf("  Trecho: %s\n", trechoID)
+		}
+	}
 }
 
 func main() {

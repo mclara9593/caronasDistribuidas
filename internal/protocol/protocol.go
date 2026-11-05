@@ -175,3 +175,17 @@ type TransactionResponse struct {
 	Accepted      bool   `json:"accepted"`
 	Reason        string `json:"reason,omitempty"`
 }
+
+type GetBookingsRequest struct {
+	PassengerEmail string `json:"passenger_email"`
+}
+
+type RideBookingsRequest struct {
+	SectionIDs []string `json:"section_ids"`
+}
+
+type BookingInfo struct {
+	ReservationID  string   `json:"reservation_id"`
+	PassengerEmail string   `json:"passenger_email"`
+	SectionIDs     []string `json:"section_ids"`
+}

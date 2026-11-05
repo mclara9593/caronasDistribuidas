@@ -2,11 +2,14 @@ package server
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/mclara9593/caronasDistribuidas/internal/consorcio"
@@ -166,6 +169,8 @@ func (s *Server) registrarRotasHTTP(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/transactions/prepare-cancel", s.handlePeerPrepareCancel)
 	mux.HandleFunc("/v1/transactions/commit-cancel", s.handlePeerCommitCancel)
 	mux.HandleFunc("/v1/transactions/abort-cancel", s.handlePeerAbortCancel)
+	mux.HandleFunc("/v1/bookings", s.handlePeerBookings)
+	mux.HandleFunc("/v1/ride-bookings", s.handlePeerRideBookings)
 }
 
 func (s *Server) handleConsultarTrechos(w http.ResponseWriter, r *http.Request) {
@@ -285,19 +290,137 @@ func (s *Server) handlePublishRide(conn net.Conn, req *protocol.Request) {
 
 func (s *Server) handleCancelRide(conn net.Conn, req *protocol.Request) {
 	var payload protocol.GetID
-	if err := json.Unmarshal(req.Payload, &payload); err != nil {
-		s.enviarErro(conn, req.RequestID, "Payload inválido")
+	if err := json.Unmarshal(req.Payload, &payload); err != nil || payload.RideID == "" {
+		s.enviarErro(conn, req.RequestID, "Payload inválido ou ID da carona ausente")
 		return
 	}
+
+	ride, existe := s.grafo.RideByID(payload.RideID)
+	if !existe {
+		s.enviarErro(conn, req.RequestID, fmt.Sprintf("carona %q não encontrada", payload.RideID))
+		return
+	}
+
+	porReserva := make(map[string]*protocol.BookingInfo)
+
+	agregar := func(reservas []protocol.BookingInfo) {
+		for _, reserva := range reservas {
+			if reserva.ReservationID == "" {
+				continue
+			}
+
+			atual, existe := porReserva[reserva.ReservationID]
+			if !existe {
+				copia := reserva
+				copia.SectionIDs = append([]string(nil), reserva.SectionIDs...)
+				porReserva[reserva.ReservationID] = &copia
+				continue
+			}
+
+			// Evita repetir trechos quando uma reserva aparece em mais
+			// de um servidor ou em mais de uma resposta.
+			seen := make(map[string]bool, len(atual.SectionIDs))
+			for _, id := range atual.SectionIDs {
+				seen[id] = true
+			}
+			for _, id := range reserva.SectionIDs {
+				if !seen[id] {
+					atual.SectionIDs = append(atual.SectionIDs, id)
+					seen[id] = true
+				}
+			}
+		}
+	}
+
+	sectionIDsCarona := make([]string, 0, len(ride.Sections))
+	for _, section := range ride.Sections {
+		sectionIDsCarona = append(sectionIDsCarona, section.IdSection)
+	}
+
+	// Inclui as reservas locais que usam trechos desta carona.
+	locais := s.grafo.ReservationsUsingSections(sectionIDsCarona)
+	for _, reserva := range locais {
+		idsComServidor := make([]string, 0, len(reserva.SectionIDs))
+		for _, id := range reserva.SectionIDs {
+			idsComServidor = append(idsComServidor, protocol.ComporSectionID(id, s.idServidor))
+		}
+		agregar([]protocol.BookingInfo{{
+			ReservationID:  reserva.ReservationID,
+			PassengerEmail: reserva.PassengerEmail,
+			SectionIDs:     idsComServidor,
+		}})
+	}
+
+	// Pergunta aos peers quais reservas locais usam os trechos da carona.
+	body, err := json.Marshal(protocol.RideBookingsRequest{SectionIDs: sectionIDsCarona})
+	if err != nil {
+		s.enviarErro(conn, req.RequestID, "Não foi possível preparar a consulta de reservas")
+		return
+	}
+
+	for peerID, urlBase := range s.peers {
+		endpoint := strings.TrimRight(urlBase, "/") + "/v1/ride-bookings"
+		httpResp, err := (&http.Client{Timeout: 5 * time.Second}).Post(
+			endpoint,
+			"application/json",
+			bytes.NewReader(body),
+		)
+		if err != nil {
+			s.enviarErro(conn, req.RequestID,
+				fmt.Sprintf("não foi possível consultar reservas no servidor %s: %v", peerID, err))
+			return
+		}
+
+		var reservasPeer []protocol.BookingInfo
+		decodeErr := json.NewDecoder(httpResp.Body).Decode(&reservasPeer)
+		httpResp.Body.Close()
+		if decodeErr != nil || httpResp.StatusCode != http.StatusOK {
+			s.enviarErro(conn, req.RequestID,
+				fmt.Sprintf("falha ao consultar reservas no servidor %s", peerID))
+			return
+		}
+		agregar(reservasPeer)
+	}
+
+	// Cada reserva é cancelada por inteiro, inclusive os trechos que não
+	// pertencem à carona que o motorista está removendo.
+	for _, reserva := range porReserva {
+		itinerario := make([]consorcio.ItemItinerario, 0, len(reserva.SectionIDs))
+		for _, sectionID := range reserva.SectionIDs {
+			itinerario = append(itinerario, consorcio.ItemItinerario{
+				SectionID: sectionID,
+				Assentos:  1,
+			})
+		}
+
+		if err := consorcio.CoordenarCancelamento(
+			reserva.ReservationID,
+			reserva.PassengerEmail,
+			itinerario,
+			s.idServidor,
+			s.relogio,
+			s.grafo,
+			s.peersRegistry,
+		); err != nil {
+			s.enviarErro(conn, req.RequestID,
+				fmt.Sprintf("não foi possível cancelar a reserva %s: %v", reserva.ReservationID, err))
+			return
+		}
+	}
+
+	// RemoveRide ainda valida que não restaram reservas ou transações pendentes.
 	if err := s.grafo.RemoveRide(payload.RideID); err != nil {
 		s.enviarErro(conn, req.RequestID, err.Error())
 		return
 	}
 	if err := s.salvarEstado(); err != nil {
-		s.enviarErro(conn, req.RequestID, "Carona removida, mas não foi possível salvar o backup: "+err.Error())
+		s.enviarErro(conn, req.RequestID,
+			"carona removida, mas não foi possível salvar o backup: "+err.Error())
 		return
 	}
-	s.enviarSucesso(conn, req.RequestID, "Carona removida com sucesso!", nil)
+
+	s.enviarSucesso(conn, req.RequestID,
+		"Carona removida e reservas associadas canceladas.", nil)
 }
 
 func (s *Server) handleGetMyRides(conn net.Conn, req *protocol.Request) {
@@ -393,7 +516,75 @@ func (s *Server) handleBookRide(conn net.Conn, req *protocol.Request) {
 }
 
 func (s *Server) handleGetBookings(conn net.Conn, req *protocol.Request) {
-	s.enviarSucesso(conn, req.RequestID, "Consulta de reservas ainda não implementada", nil)
+	var payload protocol.GetBookingsRequest
+	if err := json.Unmarshal(req.Payload, &payload); err != nil || payload.PassengerEmail == "" {
+		s.enviarErro(conn, req.RequestID, "Email do passageiro ausente ou payload inválido")
+		return
+	}
+
+	// O mesmo ID de reserva é usado nos servidores que guardam os trechos
+	// da mesma reserva. Por isso, juntamos os trechos por ReservationID.
+	porReserva := make(map[string]*protocol.BookingInfo)
+
+	agregar := func(reservas []protocol.BookingInfo) {
+		for _, reserva := range reservas {
+			existente, ok := porReserva[reserva.ReservationID]
+			if !ok {
+				copia := reserva
+				copia.SectionIDs = append([]string(nil), reserva.SectionIDs...)
+				porReserva[reserva.ReservationID] = &copia
+				continue
+			}
+			existente.SectionIDs = append(existente.SectionIDs, reserva.SectionIDs...)
+		}
+	}
+
+	locais := s.grafo.ReservationsByPassenger(payload.PassengerEmail)
+	reservasLocais := make([]protocol.BookingInfo, 0, len(locais))
+
+	for _, reserva := range locais {
+		reservasLocais = append(reservasLocais, protocol.BookingInfo{
+			ReservationID:  reserva.ReservationID,
+			PassengerEmail: reserva.PassengerEmail,
+			SectionIDs:     qualificarIDsTrechos(reserva.SectionIDs, s.idServidor),
+		})
+	}
+
+	agregar(reservasLocais)
+
+	for peerID, urlBase := range s.peers {
+		endpoint := strings.TrimRight(urlBase, "/") +
+			"/v1/bookings?passenger_email=" +
+			url.QueryEscape(payload.PassengerEmail)
+
+		httpClient := &http.Client{Timeout: 5 * time.Second}
+		resp, err := httpClient.Get(endpoint)
+		if err != nil {
+			// A consulta ainda retorna os dados obtidos dos servidores
+			// disponíveis; uma falha de peer é informada ao passageiro.
+			s.enviarErro(conn, req.RequestID,
+				fmt.Sprintf("Não foi possível consultar o servidor %s: %v", peerID, err))
+			return
+		}
+
+		var reservasPeer []protocol.BookingInfo
+		decodeErr := json.NewDecoder(resp.Body).Decode(&reservasPeer)
+		resp.Body.Close()
+		if decodeErr != nil || resp.StatusCode != http.StatusOK {
+			s.enviarErro(conn, req.RequestID,
+				fmt.Sprintf("Falha ao consultar reservas no servidor %s", peerID))
+			return
+		}
+		agregar(reservasPeer)
+	}
+
+	resultado := make([]protocol.BookingInfo, 0, len(porReserva))
+	for _, reserva := range porReserva {
+		resultado = append(resultado, *reserva)
+	}
+
+	s.enviarSucesso(conn, req.RequestID,
+		fmt.Sprintf("%d reserva(s) encontrada(s)", len(resultado)), resultado)
 }
 
 func (s *Server) handleCancelBooking(conn net.Conn, req *protocol.Request) {
@@ -407,10 +598,117 @@ func (s *Server) handleCancelBooking(conn net.Conn, req *protocol.Request) {
 		return
 	}
 
-	// Não usar CancelReservation diretamente aqui: isso libera assentos
-	// apenas neste servidor. O cancelamento distribuído precisa de um
-	// coordenador 2PC com decisão persistida e recuperação após reinício.
-	s.enviarErro(conn, req.RequestID, "Cancelamento distribuído ainda não está conectado ao coordenador 2PC")
+	porReserva := make(map[string]*protocol.BookingInfo)
+
+	agregar := func(reservas []protocol.BookingInfo) {
+		for _, reserva := range reservas {
+			if reserva.ReservationID != payload.ReservationID ||
+				reserva.PassengerEmail != payload.PassengerEmail {
+				continue
+			}
+
+			atual, existe := porReserva[reserva.ReservationID]
+			if !existe {
+				copia := reserva
+				copia.SectionIDs = append([]string(nil), reserva.SectionIDs...)
+				porReserva[reserva.ReservationID] = &copia
+				continue
+			}
+
+			seen := make(map[string]bool, len(atual.SectionIDs))
+			for _, id := range atual.SectionIDs {
+				seen[id] = true
+			}
+			for _, id := range reserva.SectionIDs {
+				if !seen[id] {
+					atual.SectionIDs = append(atual.SectionIDs, id)
+					seen[id] = true
+				}
+			}
+		}
+	}
+
+	locais := s.grafo.ReservationsByPassenger(payload.PassengerEmail)
+	reservasLocais := make([]protocol.BookingInfo, 0, len(locais))
+	for _, reserva := range locais {
+		idsComServidor := make([]string, 0, len(reserva.SectionIDs))
+		for _, id := range reserva.SectionIDs {
+			idsComServidor = append(idsComServidor, protocol.ComporSectionID(id, s.idServidor))
+		}
+		reservasLocais = append(reservasLocais, protocol.BookingInfo{
+			ReservationID:  reserva.ReservationID,
+			PassengerEmail: reserva.PassengerEmail,
+			SectionIDs:     idsComServidor,
+		})
+	}
+	agregar(reservasLocais)
+
+	for peerID, urlBase := range s.peers {
+		endpoint := strings.TrimRight(urlBase, "/") +
+			"/v1/bookings?passenger_email=" + url.QueryEscape(payload.PassengerEmail)
+
+		resp, err := (&http.Client{Timeout: 5 * time.Second}).Get(endpoint)
+		if err != nil {
+			s.enviarErro(conn, req.RequestID,
+				fmt.Sprintf("não foi possível consultar o servidor %s: %v", peerID, err))
+			return
+		}
+
+		var reservasPeer []protocol.BookingInfo
+		decodeErr := json.NewDecoder(resp.Body).Decode(&reservasPeer)
+		resp.Body.Close()
+		if decodeErr != nil || resp.StatusCode != http.StatusOK {
+			s.enviarErro(conn, req.RequestID,
+				fmt.Sprintf("falha ao consultar reservas no servidor %s", peerID))
+			return
+		}
+
+		// /v1/bookings devolve IDs locais; aqui identificamos o servidor
+		// que respondeu para formar os IDs usados pelo coordenador.
+		for i := range reservasPeer {
+			for j, id := range reservasPeer[i].SectionIDs {
+				if _, _, err := protocol.DecomporSectionID(id); err != nil {
+					reservasPeer[i].SectionIDs[j] = protocol.ComporSectionID(id, peerID)
+				}
+			}
+		}
+		agregar(reservasPeer)
+	}
+
+	reserva, existe := porReserva[payload.ReservationID]
+	if !existe || len(reserva.SectionIDs) == 0 {
+		s.enviarErro(conn, req.RequestID, "Reserva não encontrada")
+		return
+	}
+
+	itinerario := make([]consorcio.ItemItinerario, 0, len(reserva.SectionIDs))
+	for _, sectionID := range reserva.SectionIDs {
+		itinerario = append(itinerario, consorcio.ItemItinerario{
+			SectionID: sectionID,
+			Assentos:  1,
+		})
+	}
+
+	if err := consorcio.CoordenarCancelamento(
+		reserva.ReservationID,
+		reserva.PassengerEmail,
+		itinerario,
+		s.idServidor,
+		s.relogio,
+		s.grafo,
+		s.peersRegistry,
+	); err != nil {
+		s.enviarErro(conn, req.RequestID, err.Error())
+		return
+	}
+
+	if err := s.salvarEstado(); err != nil {
+		s.enviarErro(conn, req.RequestID,
+			"reserva cancelada, mas não foi possível salvar o backup: "+err.Error())
+		return
+	}
+
+	s.enviarSucesso(conn, req.RequestID, "Reserva cancelada com sucesso.", nil)
 }
 
 func (s *Server) handlePeerSearch(w http.ResponseWriter, r *http.Request) {
@@ -514,4 +812,80 @@ func (s *Server) escreverResponse(conn net.Conn, resp protocol.Response) {
 		return
 	}
 	_, _ = conn.Write(append(bytes, '\n'))
+}
+
+func (s *Server) handlePeerBookings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "método não permitido", http.StatusMethodNotAllowed)
+		return
+	}
+
+	email := r.URL.Query().Get("passenger_email")
+	if email == "" {
+		http.Error(w, "parâmetro 'passenger_email' obrigatório", http.StatusBadRequest)
+		return
+	}
+
+	reservas := s.grafo.ReservationsByPassenger(email)
+	resposta := make([]protocol.BookingInfo, 0, len(reservas))
+
+	for _, reserva := range reservas {
+		resposta = append(resposta, protocol.BookingInfo{
+			ReservationID:  reserva.ReservationID,
+			PassengerEmail: reserva.PassengerEmail,
+
+			SectionIDs: qualificarIDsTrechos(reserva.SectionIDs, s.idServidor),
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(resposta)
+}
+
+func (s *Server) handlePeerRideBookings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "método não permitido", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var payload protocol.RideBookingsRequest
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil || len(payload.SectionIDs) == 0 {
+		http.Error(w, "payload inválido ou lista de trechos ausente", http.StatusBadRequest)
+		return
+	}
+
+	reservas := s.grafo.ReservationsUsingSections(payload.SectionIDs)
+	resultado := make([]protocol.BookingInfo, 0, len(reservas))
+
+	for _, reserva := range reservas {
+		idsComServidor := make([]string, 0, len(reserva.SectionIDs))
+		for _, id := range reserva.SectionIDs {
+			idsComServidor = append(idsComServidor, protocol.ComporSectionID(id, s.idServidor))
+		}
+
+		resultado = append(resultado, protocol.BookingInfo{
+			ReservationID:  reserva.ReservationID,
+			PassengerEmail: reserva.PassengerEmail,
+			SectionIDs:     idsComServidor,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(resultado)
+}
+
+func qualificarIDsTrechos(sectionIDs []string, servidor string) []string {
+	resultado := make([]string, 0, len(sectionIDs))
+
+	for _, id := range sectionIDs {
+		// Se já estiver no formato trecho@servidor, preserva o ID.
+		if _, _, err := protocol.DecomporSectionID(id); err == nil {
+			resultado = append(resultado, id)
+			continue
+		}
+
+		resultado = append(resultado, protocol.ComporSectionID(id, servidor))
+	}
+
+	return resultado
 }
